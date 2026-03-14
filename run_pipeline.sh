@@ -56,12 +56,12 @@ else
 fi
 
 # Step 2: HSV-V 扩容
-ts "Step 2: 数据扩容到约 10 万张..." | tee -a "$LOG"
+ts "Step 2: 数据扩容（target=50000，约 5 万张）..." | tee -a "$LOG"
 if [ ! -d "$BASE/data/dataset_aug/train" ]; then
     $PYTHON "$BASE/augment_dataset.py" \
         --src "$BASE/data/dataset" \
         --dst "$BASE/data/dataset_aug" \
-        --target 100000 2>&1 | tee -a "$LOG"
+        --target 50000 2>&1 | tee -a "$LOG"
 else
     ts "扩容数据集已存在，跳过 Step 2" | tee -a "$LOG"
 fi
