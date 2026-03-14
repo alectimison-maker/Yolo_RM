@@ -1,0 +1,24 @@
+# 数据集（体积过大，通过 GitHub Release 下载）
+data/
+
+# 训练过程图片和中间检查点
+runs/**/*.jpg
+runs/**/*.png
+runs/**/weights/epoch*.pt
+runs/**/weights/last.pt
+
+# 日志文件
+*.log
+
+# 预训练权重（从 Ultralytics 官方下载，见 README）
+yolo11n-pose.pt
+yolo26n.pt
+
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+
+# 系统文件
+.DS_Store
+Thumbs.db

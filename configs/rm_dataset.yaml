@@ -1,0 +1,27 @@
+# RM 装甲板 Pose 估计数据集配置
+# 注意: 原始数据中 BS(蓝方哨兵) 和 RS(红方哨兵) 无关键点标注，已从数据集移除
+# 类别从 14 类缩减为 12 类，ID 重新连续编号
+
+path: /home/ailab/code/cyx/rm_yolo/data/dataset_aug
+train: train/images
+val:   val/images
+
+# 4 个装甲板角点关键点，无 visibility 维度
+kpt_shape: [4, 2]
+# 水平翻转时关键点重映射: 左上(0)↔右上(1)，右下(2)↔左下(3)
+flip_idx: [1, 0, 3, 2]
+
+nc: 12
+names:
+  0:  B1   # 蓝方一号
+  1:  B2   # 蓝方二号
+  2:  B3   # 蓝方三号
+  3:  B4   # 蓝方四号
+  4:  B5   # 蓝方五号
+  5:  BO   # 蓝方前哨站
+  6:  R1   # 红方一号
+  7:  R2   # 红方二号
+  8:  R3   # 红方三号
+  9:  R4   # 红方四号
+  10: R5   # 红方五号
+  11: RO   # 红方前哨站
