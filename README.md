@@ -23,7 +23,7 @@ rm_yolo/
 │   │   ├── val/images/
 │   │   └── val/labels/
 │   └── dataset_aug/              # augment_dataset.py 输出（HSV V 通道扩容后）
-│       ├── train/images/         # ~107,216 张
+│       ├── train/images/         # ~50,724 张
 │       ├── train/labels/
 │       ├── val/images/           # 3,350 张（不扩容）
 │       └── val/labels/
@@ -171,11 +171,12 @@ class x y w h  →  class x y w h 0 0 0 0 0 0 0 0
 
 **第一层：离线扩容（augment_dataset.py，生成静态文件保存到磁盘）**
 
-调整 HSV V（亮度）通道模拟不同曝光，每张原图生成 8 个版本：
+调整 HSV V（亮度）通道模拟不同曝光，每张原图生成 9 个版本：
 
 ```python
 # V 系数均匀分布在 [0.4, 1.6]：从极暗到过曝
-v_scales = [0.4, 0.57, 0.74, 0.91, 1.09, 1.26, 1.43, 1.6]
+# v_scales 由 target/n 动态计算，target=50000, n=5637 → 9个版本
+# v_scales = linspace(0.4, 1.6, 9)
 # 转 HSV → 只缩放 V 通道 → 还原 BGR
 hsv[:, :, 2] = np.clip(hsv[:, :, 2] * scale, 0, 255)
 ```
@@ -196,7 +197,7 @@ hsv[:, :, 2] = np.clip(hsv[:, :, 2] * scale, 0, 255)
 
 | 集合 | 数量 |
 |------|------|
-| 训练集（扩容后） | ~107,216 |
+| 训练集（扩容后） | ~50,724 |
 | 验证集 | 3,350（不扩容） |
 
 ### 标签格式（YOLO Pose，13 列）
