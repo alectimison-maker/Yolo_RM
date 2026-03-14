@@ -27,7 +27,7 @@ rm_yolo/
 │       ├── train/labels/
 │       ├── val/images/           # 3,350 张（不扩容）
 │       └── val/labels/
-├── runs/                         # 训练输出（不上传 GitHub）
+├── runs/                         # 训练输出
 │   └── rm_pose_v1/
 │       ├── weights/
 │       │   ├── best.pt           # 验证集最优权重（val fitness 历史最高时保存）
@@ -41,14 +41,13 @@ rm_yolo/
 │       ├── best.onnx             # ONNX 导出（训练结束后自动生成）
 │       └── best_openvino_model/  # OpenVINO 导出（训练结束后自动生成）
 ├── prepare_dataset.py            # Step 1：标签格式统一 + 8:2 随机划分
-├── augment_dataset.py            # Step 2：HSV V 通道离线扩容至约 10 万张
+├── augment_dataset.py            # Step 2：HSV V 通道离线扩容至约 5 万张
 ├── train.py                      # Step 3：训练 + 自动导出 ONNX/OpenVINO
 ├── run_pipeline.sh               # 一键运行完整流水线
 ├── yolo11n-pose.pt               # 预训练权重
 └── README.md
 ```
 
-> `data/`、`runs/`、`*.log`、`yolo11n-pose.pt` 均在 `.gitignore` 中，不会上传到仓库。
 
 ---
 
@@ -126,11 +125,11 @@ python prepare_dataset.py \
     --src /path/to/raw_dataset \
     --dst ./data/dataset
 
-# Step 2：HSV V 通道扩容（train 扩至约 10 万张，val 不变）
+# Step 2：HSV V 通道扩容（train 扩至约 5 万张，val 不变）
 python augment_dataset.py \
     --src ./data/dataset \
     --dst ./data/dataset_aug \
-    --target 100000
+    --target 50000
 
 # Step 3：单卡训练
 python train.py --device 0 --batch 64
@@ -171,7 +170,7 @@ class x y w h  →  class x y w h 0 0 0 0 0 0 0 0
 
 **第一层：离线扩容（augment_dataset.py，生成静态文件保存到磁盘）**
 
-调整 HSV V（亮度）通道模拟不同曝光，每张原图生成 9 个版本：
+调整 HSV V通道模拟不同曝光，每张原图生成 9 个版本：
 
 ```python
 # V 系数均匀分布在 [0.4, 1.6]：从极暗到过曝
@@ -220,16 +219,16 @@ class  x_center  y_center  width  height  kp1x  kp1y  kp2x  kp2y  kp3x  kp3y  kp
 | 3  | B4 | 蓝方四号机器人 |
 | 4  | B5 | 蓝方五号机器人 |
 | 5  | BO | 蓝方前哨站 |
-| 6  | BS | 蓝方哨兵（原始数据无关键点标注，关键点补零） |
+| 6  | BS | 蓝方哨兵 |
 | 7  | R1 | 红方一号机器人 |
 | 8  | R2 | 红方二号机器人 |
 | 9  | R3 | 红方三号机器人 |
 | 10 | R4 | 红方四号机器人 |
 | 11 | R5 | 红方五号机器人 |
 | 12 | RO | 红方前哨站 |
-| 13 | RS | 红方哨兵（原始数据无关键点标注，关键点补零） |
+| 13 | RS | 红方哨兵 |
 
-> **B3 样本极少**：labels.jpg 中 B3 数据量很少，这是原始数据集本身标注分布不均衡的问题，不影响其他类别的训练效果。
+> 现在的问题：**B3 样本极少**：labels.jpg 中 B3 数据量很少，这是原始数据集本身标注分布不均衡的问题，不影响其他类别的训练效果。
 
 ---
 
