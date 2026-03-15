@@ -27,8 +27,8 @@ rm_yolo/
 │       ├── train/labels/
 │       ├── val/images/           # 3,350 张（不扩容）
 │       └── val/labels/
-├── runs/                         # 训练输出
-│   └── rm_pose_v1/
+├── runs/                         # 训练输出（不上传 GitHub）
+│   └── rm_pose_v2/
 │       ├── weights/
 │       │   ├── best.pt           # 验证集最优权重（val fitness 历史最高时保存）
 │       │   ├── last.pt           # 最后一轮权重
@@ -48,6 +48,7 @@ rm_yolo/
 └── README.md
 ```
 
+> `data/`、`runs/`、`*.log`、`yolo11n-pose.pt` 均在 `.gitignore` 中，不会上传到仓库。
 
 ---
 
@@ -58,7 +59,6 @@ rm_yolo/
 ```bash
 # 方法一：通过 ultralytics 自动下载（需联网）
 python -c "from ultralytics import YOLO; YOLO('yolo11n-pose.pt')"
-# 下载后复制到项目根目录即可
 
 # 方法二：手动下载后放到项目根目录
 # https://github.com/ultralytics/assets/releases 找 yolo11n-pose.pt
@@ -161,22 +161,17 @@ python train.py --device 0,1 --batch 128
 | 纯检测标注 | 5 列 | `class x y w h` |
 | Pose 标注 | 13 列 | `class x y w h kp1x kp1y kp2x kp2y kp3x kp3y kp4x kp4y` |
 
-`prepare_dataset.py` 将 5 列格式补零关键点，统一为 13 列：
-```
-class x y w h  →  class x y w h 0 0 0 0 0 0 0 0
-```
+`prepare_dataset.py` 只保留含有 13 列 pose 标签的图片（丢弃 5 列纯检测标注，避免补零引入矛盾监督信号）。
 
 ### 数据增强（两层叠加）
 
 **第一层：离线扩容（augment_dataset.py，生成静态文件保存到磁盘）**
 
-调整 HSV V通道模拟不同曝光，每张原图生成 9 个版本：
+调整 HSV V（亮度）通道模拟不同曝光，每张原图生成 9 个版本：
 
 ```python
 # V 系数均匀分布在 [0.4, 1.6]：从极暗到过曝
 # v_scales 由 target/n 动态计算，target=50000, n=5637 → 9个版本
-# v_scales = linspace(0.4, 1.6, 9)
-# 转 HSV → 只缩放 V 通道 → 还原 BGR
 hsv[:, :, 2] = np.clip(hsv[:, :, 2] * scale, 0, 255)
 ```
 
@@ -228,7 +223,7 @@ class  x_center  y_center  width  height  kp1x  kp1y  kp2x  kp2y  kp3x  kp3y  kp
 | 12 | RO | 红方前哨站 |
 | 13 | RS | 红方哨兵 |
 
-> 现在的问题：**B3 样本极少**：labels.jpg 中 B3 数据量很少，这是原始数据集本身标注分布不均衡的问题，不影响其他类别的训练效果。
+> **B3 样本极少**：labels.jpg 中 B3 数据量很少，这是原始数据集本身标注分布不均衡的问题，不影响其他类别的训练效果。
 
 ---
 
@@ -237,8 +232,8 @@ class  x_center  y_center  width  height  kp1x  kp1y  kp2x  kp2y  kp3x  kp3y  kp
 ### 模型
 
 - 基础模型：YOLO11n-pose（nano 变体，最轻量）
-- 参数量：2,664,594（~2.7M）
-- 计算量：6.7 GFLOPs
+- 参数量：2,656,810（~2.7M，fused 推理时）
+- 计算量：6.6 GFLOPs
 
 ### 关键点配置（configs/rm_dataset.yaml）
 
@@ -247,7 +242,7 @@ kpt_shape: [4, 2]       # 4 个关键点，每个 (x, y)，无 visibility 维度
 flip_idx: [1, 0, 3, 2]  # 水平翻转时关键点重映射：kp0↔kp1，kp2↔kp3
 ```
 
-### 超参数（完整说明见 runs/rm_pose_v1/args.yaml）
+### 超参数（完整说明见 runs/rm_pose_v2/args.yaml）
 
 | 参数 | 值 | 说明 |
 |------|----|------|
@@ -272,8 +267,6 @@ flip_idx: [1, 0, 3, 2]  # 水平翻转时关键点重映射：kp0↔kp1，kp2↔
 fitness = 0.1 × mAP50(B) + 0.9 × mAP50-95(B)
 ```
 
-权重设计逻辑：mAP50-95 要求在 IoU 0.5~0.95 的多个严格阈值下都精准，比 mAP50 严格得多。用 0.9 的高权重驱动模型追求精确定位，而不仅仅是粗糙检测到目标。
-
 每个 epoch 验证后：fitness 未创新高则计数器 +1；连续 50 轮无改善则停止。`best.pt` 始终保存 fitness 历史最优时刻的权重。
 
 ---
@@ -293,27 +286,18 @@ batch=128 → GPU0 处理 64 张 + GPU1 处理 64 张（并行前向传播）
 
 ### best.pt（PyTorch 格式）
 
-训练直接产出的权重文件，存储模型所有层的参数。
-
 - 需要 Python + PyTorch + Ultralytics 环境
 - 支持继续训练（resume）
-- 不适合嵌入式部署
 
 ```python
 from ultralytics import YOLO
-model = YOLO("runs/rm_pose_v1/weights/best.pt")
+model = YOLO("runs/rm_pose_v2/weights/best.pt")
 results = model("test.jpg")
 ```
 
 ### best.onnx（ONNX 格式）
 
-Open Neural Network Exchange，微软/Facebook 联合推出的跨框架标准格式。
-
-- 跨平台（Windows/Linux/macOS）、跨语言（Python/C++/Java）
-- 脱离 PyTorch 依赖，用 OpenCV DNN 或 ONNXRuntime 加载
-- RM 视觉代码中最常用的部署格式
-
-**适用场景：** 工控机、NUC、工业 PC 等通用 x86 平台
+跨平台跨语言，脱离 PyTorch 依赖，用 OpenCV DNN 或 ONNXRuntime 加载。**适用场景：** 工控机、NUC 等通用 x86 平台。
 
 ```cpp
 // C++ ONNXRuntime 推理示例
@@ -322,15 +306,7 @@ Ort::Session session(env, "best.onnx", session_options);
 
 ### best_openvino_model/（OpenVINO 格式）
 
-Intel 推出的推理优化框架，转换为 Intel 硬件专用中间表示（IR）。
-
-输出两个文件：`best.xml`（网络结构）+ `best.bin`（权重数据）
-
-- 在 Intel CPU 上推理速度比 PyTorch 快 2-5×
-- 支持 Intel 神经计算棒（NCS2 / Myriad X VPU）
-- 不依赖 GPU，适合无独立显卡的上位机
-
-**适用场景：** RM 上位机（i7/i9 CPU），或 Intel NCS2
+输出 `best.xml`（网络结构）+ `best.bin`（权重数据），在 Intel CPU 上推理速度比 PyTorch 快 2-5×。**适用场景：** RM 上位机（i7/i9 CPU）。
 
 ### 格式对比
 
@@ -356,8 +332,6 @@ Intel 推出的推理优化框架，转换为 Intel 硬件专用中间表示（I
 
 ---
 
-
-
 ## 数据集下载
 
 完整数据集通过 GitHub Release 提供：
@@ -373,7 +347,7 @@ unzip dataset_raw.zip -d data/dataset_raw
 unzip dataset.zip -d data/dataset
 ```
 
-> `dataset_aug/`（107k 张扩容数据集）可通过 `augment_dataset.py` 从 `dataset/` 生成，不单独分发。
+> `dataset_aug/`（约 50,724 张扩容数据集）可通过 `augment_dataset.py --target 50000` 从 `dataset/` 生成，不单独分发。
 
 ---
 
@@ -381,36 +355,38 @@ unzip dataset.zip -d data/dataset
 
 | 文件 | 格式 | 说明 |
 |------|------|------|
-| `runs/rm_pose_v1/weights/best.pt` | PyTorch | 验证集最优权重 |
-| `runs/rm_pose_v1/weights/best.onnx` | ONNX | 跨平台部署格式 |
-| `runs/rm_pose_v1/weights/best_openvino_model/` | OpenVINO | Intel 硬件优化 |
+| `runs/rm_pose_v2/weights/best.pt` | PyTorch | 验证集最优权重（epoch 161） |
+| `runs/rm_pose_v2/weights/best.onnx` | ONNX | 跨平台部署格式 |
+| `runs/rm_pose_v2/weights/best_openvino_model/` | OpenVINO | Intel 硬件优化 |
 
 ---
 
 ## 训练结果参考
 
-> 实际训练：epoch 158（设定上限 300，patience=50 提前停止），耗时约 16.8 小时（Tesla V100-PCIE-16GB）
+> 实际训练：epoch 161 达到最佳（设定上限 300，patience=50 在 epoch 211 提前停止），耗时约 17.5 小时（2× Tesla V100-PCIE-16GB，DDP）
 
 | 指标 | 值 |
 |------|-----|
-| Box mAP@0.5 | 0.965 |
-| Box mAP@0.5:0.95 | 0.713 |
-| Pose mAP@0.5 | 0.917 |
-| Pose mAP@0.5:0.95 | 0.888 |
+| Box mAP@0.5 | 0.970 |
+| Box mAP@0.5:0.95 | 0.739 |
+| Pose mAP@0.5 | 0.925 |
+| Pose mAP@0.5:0.95 | 0.901 |
 
 各类别详细指标：
 
 | 类别 | Box P | Box R | Box mAP50 | Pose P | Pose R | Pose mAP50 |
 |------|-------|-------|-----------|--------|--------|------------|
-| B1   | 0.940 | 0.930 | 0.961 | 0.898 | 0.892 | 0.903 |
-| B2   | 0.959 | 0.955 | 0.973 | 0.932 | 0.936 | 0.944 |
-| B3   | 0.946 | 0.878 | 0.929 | 0.943 | 0.878 | 0.931 |
-| B4   | 0.951 | 0.954 | 0.978 | 0.923 | 0.930 | 0.936 |
-| B5   | 0.971 | 0.876 | 0.942 | 0.924 | 0.848 | 0.886 |
-| BO   | 1.000 | 0.974 | 0.995 | 1.000 | 0.991 | 0.995 |
-| R1   | 0.986 | 0.969 | 0.986 | 0.879 | 0.865 | 0.826 |
-| R2   | 0.955 | 0.884 | 0.948 | 0.917 | 0.853 | 0.893 |
-| R3   | 0.923 | 0.958 | 0.953 | 0.884 | 0.926 | 0.916 |
-| R4   | 0.956 | 0.924 | 0.979 | 0.930 | 0.902 | 0.935 |
-| R5   | 0.946 | 0.922 | 0.971 | 0.932 | 0.918 | 0.958 |
-| RO   | 0.953 | 0.953 | 0.971 | 0.888 | 0.894 | 0.875 |
+| B1   | 0.933 | 0.901 | 0.956 | 0.877 | 0.847 | 0.875 |
+| B2   | 0.978 | 0.936 | 0.977 | 0.944 | 0.904 | 0.942 |
+| B3   | 0.952 | 0.870 | 0.939 | 0.952 | 0.870 | 0.939 |
+| B4   | 0.954 | 0.939 | 0.975 | 0.927 | 0.913 | 0.925 |
+| B5   | 0.942 | 0.897 | 0.946 | 0.884 | 0.841 | 0.870 |
+| BO   | 1.000 | 0.970 | 0.994 | 1.000 | 0.970 | 0.994 |
+| BS   | 0.974 | 0.986 | 0.987 | 0.867 | 0.878 | 0.850 |
+| R1   | 0.971 | 0.907 | 0.955 | 0.924 | 0.863 | 0.895 |
+| R2   | 0.930 | 0.938 | 0.963 | 0.909 | 0.917 | 0.935 |
+| R3   | 0.950 | 0.933 | 0.977 | 0.916 | 0.900 | 0.933 |
+| R4   | 0.953 | 0.910 | 0.961 | 0.938 | 0.895 | 0.942 |
+| R5   | 0.966 | 0.941 | 0.973 | 0.918 | 0.894 | 0.905 |
+| RO   | 0.953 | 0.972 | 0.981 | 0.940 | 0.958 | 0.956 |
+| RS   | 0.994 | 1.000 | 0.995 | 0.979 | 0.986 | 0.990 |
