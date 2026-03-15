@@ -27,7 +27,7 @@ rm_yolo/
 │       ├── train/labels/
 │       ├── val/images/           # 3,350 张（不扩容）
 │       └── val/labels/
-├── runs/                         # 训练输出（不上传 GitHub）
+├── runs/                         # 训练输出
 │   └── rm_pose_v2/
 │       ├── weights/
 │       │   ├── best.pt           # 验证集最优权重（val fitness 历史最高时保存）
@@ -48,7 +48,6 @@ rm_yolo/
 └── README.md
 ```
 
-> `data/`、`runs/`、`*.log`、`yolo11n-pose.pt` 均在 `.gitignore` 中，不会上传到仓库。
 
 ---
 
