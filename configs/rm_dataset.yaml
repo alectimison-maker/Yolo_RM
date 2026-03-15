@@ -1,12 +1,7 @@
 # RM 装甲板 Pose 估计数据集配置
 # 类别 ID 与原始标签保持完全一致（0-13，共 14 类）
-#
-# ⚠️  历史说明：v1.0（best.pt）使用了错误的 nc=12 yaml 训练：
-#     - BS(6) 被误命名为 R1，R1-R5/RO/RS 类名全部错位
-#     - RO(12) 和 RS(13) 因超出 nc 范围被 YOLO 自动丢弃
-#     建议使用本文件（nc=14）重新训练以获得正确的 14 类模型。
 
-path: /home/ailab/code/cyx/rm_yolo/data/dataset_aug
+path: /home/.../rm_yolo/data/dataset_aug
 train: train/images
 val:   val/images
 
