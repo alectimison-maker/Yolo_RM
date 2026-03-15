@@ -27,7 +27,7 @@
   kp4: 装甲板左下角
 
 类别 ID 保持原始编号不变（0-13，共 14 类）。
-BS(6) 和 RS(13) 当前无 13 列样本，补充数据集后可自动纳入。
+BS(6) 和 RS(13) 已通过补充哨兵数据集纳入训练，各有约 70 张验证样本。
 
 用法:
   python prepare_dataset.py --src /path/to/raw_dataset --dst /path/to/output
